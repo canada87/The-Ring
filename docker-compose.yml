@@ -1,0 +1,13 @@
+services:
+  the-ring:
+    build: .
+    container_name: the-ring
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - TZ=Europe/Rome
+      - RING_DB_PATH=/data/ring.db
+      - RING_TZ=Europe/Rome

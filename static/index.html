@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>The Ring</title>
+<meta name="theme-color" content="#c65d8f" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="The Ring" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <h1>The Ring</h1>
+  </header>
+
+  <main>
+    <section id="view-dashboard" class="view">
+      <div id="setup-card" class="card hidden">
+        <h2>Primo utilizzo</h2>
+        <p>Registra quando hai inserito l'anello attualmente in uso per iniziare a tracciare il ciclo.</p>
+        <label class="field">
+          <span>Data e ora di inserimento</span>
+          <input type="datetime-local" id="setup-datetime" />
+        </label>
+        <button id="setup-submit" class="btn btn-primary">Inizia a tracciare</button>
+      </div>
+
+      <div id="dashboard-card" class="card hidden">
+        <div id="overtime-banner" class="banner hidden"></div>
+
+        <div class="ring-wrap">
+          <svg viewBox="0 0 200 200" class="progress-ring">
+            <circle class="progress-ring__bg" cx="100" cy="100" r="88" />
+            <circle id="progress-ring__value" class="progress-ring__value" cx="100" cy="100" r="88" />
+          </svg>
+          <div class="ring-center">
+            <div id="ring-days" class="ring-days">-</div>
+            <div id="ring-unit" class="ring-unit"></div>
+          </div>
+        </div>
+
+        <div id="phase-label" class="phase-label"></div>
+        <div id="due-date" class="due-date"></div>
+
+        <div class="timeline">
+          <div class="timeline-track">
+            <div id="timeline-wear" class="timeline-segment timeline-wear"></div>
+            <div id="timeline-rest" class="timeline-segment timeline-rest"></div>
+            <div id="timeline-cursor" class="timeline-cursor"></div>
+          </div>
+          <div class="timeline-labels">
+            <span>3 settimane dentro</span>
+            <span>1 settimana fuori</span>
+          </div>
+        </div>
+
+        <button id="action-btn" class="btn btn-primary btn-large"></button>
+      </div>
+    </section>
+
+    <section id="view-history" class="view hidden">
+      <h2>Storico</h2>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+
+    <section id="view-settings" class="view hidden">
+      <h2>Impostazioni</h2>
+
+      <div class="card">
+        <h3>Notifiche ntfy</h3>
+        <label class="field">
+          <span>Server ntfy</span>
+          <input type="text" id="settings-server" placeholder="https://ntfy.sh" />
+        </label>
+        <label class="field">
+          <span>Topic</span>
+          <input type="text" id="settings-topic" placeholder="anello-xxxxx" />
+        </label>
+        <label class="field field-row">
+          <span>Notifiche attive</span>
+          <input type="checkbox" id="settings-enabled" />
+        </label>
+        <div class="btn-row">
+          <button id="settings-save" class="btn btn-primary">Salva</button>
+          <button id="settings-test" class="btn btn-secondary">Invia test</button>
+        </div>
+        <p id="settings-feedback" class="feedback"></p>
+        <p class="hint">
+          Apri l'app <strong>ntfy</strong> sul telefono e iscriviti al topic indicato sopra
+          (server predefinito: ntfy.sh) per ricevere i promemoria.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="history">Storico</button>
+    <button class="nav-btn" data-view="settings">Impostazioni</button>
+  </nav>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
