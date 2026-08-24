@@ -32,6 +32,10 @@ class RingActionRequest(BaseModel):
     at: Optional[str] = None
 
 
+class EventEditRequest(BaseModel):
+    at: str
+
+
 class SettingsUpdateRequest(BaseModel):
     ntfy_server: Optional[str] = None
     ntfy_topic: Optional[str] = None
@@ -93,6 +97,18 @@ def api_delete_event(event_id: int):
                 status_code=409,
                 detail="Puoi annullare solo l'ultimo evento registrato.",
             )
+        return {"status": logic.compute_status(conn)}
+    finally:
+        conn.close()
+
+
+@app.patch("/api/history/{event_id}")
+def api_edit_event(event_id: int, body: EventEditRequest):
+    conn = get_connection()
+    try:
+        ok, error = logic.edit_event(conn, event_id, body.at)
+        if not ok:
+            raise HTTPException(status_code=409, detail=error)
         return {"status": logic.compute_status(conn)}
     finally:
         conn.close()

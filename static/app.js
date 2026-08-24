@@ -167,6 +167,14 @@ el("setup-submit").addEventListener("click", async () => {
   }
 });
 
+function toLocalInputValue(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
 async function loadHistory() {
   const res = await fetch("/api/history?limit=50");
   const items = await res.json();
@@ -174,16 +182,30 @@ async function loadHistory() {
   list.innerHTML = "";
   items.forEach((item, idx) => {
     const li = document.createElement("li");
+    li.className = "history-item";
+
+    const row = document.createElement("div");
+    row.className = "history-row";
+
     const tag = document.createElement("span");
     tag.className = `tag ${item.type}`;
     tag.textContent = item.type === "insert" ? "Inserito" : "Tolto";
+
     const date = document.createElement("span");
+    date.className = "history-date";
     date.textContent = fmtDateTime(item.at);
-    li.appendChild(tag);
-    li.appendChild(date);
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "link-btn";
+    editBtn.textContent = "Modifica";
+    actions.appendChild(editBtn);
+
     if (idx === 0) {
       const undo = document.createElement("button");
-      undo.className = "undo-btn";
+      undo.className = "link-btn";
       undo.textContent = "Annulla";
       undo.onclick = async () => {
         if (!confirm("Annullare l'ultimo evento registrato?")) return;
@@ -193,8 +215,64 @@ async function loadHistory() {
           fetchStatus();
         }
       };
-      li.appendChild(undo);
+      actions.appendChild(undo);
     }
+
+    row.appendChild(tag);
+    row.appendChild(date);
+    row.appendChild(actions);
+    li.appendChild(row);
+
+    const editForm = document.createElement("div");
+    editForm.className = "history-edit hidden";
+
+    const input = document.createElement("input");
+    input.type = "datetime-local";
+    input.value = toLocalInputValue(item.at);
+
+    const editBtnRow = document.createElement("div");
+    editBtnRow.className = "btn-row";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn btn-primary btn-small";
+    saveBtn.textContent = "Salva";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn btn-secondary btn-small";
+    cancelBtn.textContent = "Annulla modifica";
+
+    const errorEl = document.createElement("p");
+    errorEl.className = "feedback error";
+
+    editBtnRow.appendChild(saveBtn);
+    editBtnRow.appendChild(cancelBtn);
+    editForm.appendChild(input);
+    editForm.appendChild(editBtnRow);
+    editForm.appendChild(errorEl);
+    li.appendChild(editForm);
+
+    editBtn.onclick = () => {
+      errorEl.textContent = "";
+      editForm.classList.toggle("hidden");
+    };
+    cancelBtn.onclick = () => editForm.classList.add("hidden");
+    saveBtn.onclick = async () => {
+      if (!input.value) return;
+      const at = new Date(input.value).toISOString();
+      const r = await fetch(`/api/history/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ at }),
+      });
+      if (r.ok) {
+        loadHistory();
+        fetchStatus();
+      } else {
+        const err = await r.json().catch(() => ({}));
+        errorEl.textContent = err.detail || "Errore nella modifica.";
+      }
+    };
+
     list.appendChild(li);
   });
   if (items.length === 0) {

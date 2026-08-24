@@ -75,6 +75,37 @@ def delete_last_event(conn: sqlite3.Connection, event_id: int) -> bool:
     return True
 
 
+def edit_event(
+    conn: sqlite3.Connection, event_id: int, new_at: str
+) -> tuple[bool, Optional[str]]:
+    row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None:
+        return False, "Evento non trovato."
+
+    prev = conn.execute(
+        "SELECT * FROM events WHERE id < ? ORDER BY id DESC LIMIT 1", (event_id,)
+    ).fetchone()
+    nxt = conn.execute(
+        "SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT 1", (event_id,)
+    ).fetchone()
+
+    try:
+        new_dt = parse_iso(new_at)
+    except ValueError:
+        return False, "Data non valida."
+
+    if prev is not None and new_dt <= parse_iso(prev["at"]):
+        return False, "La data deve essere successiva all'evento precedente."
+    if nxt is not None and new_dt >= parse_iso(nxt["at"]):
+        return False, "La data deve essere precedente all'evento successivo."
+
+    conn.execute("UPDATE events SET at = ? WHERE id = ?", (new_at, event_id))
+    conn.execute("DELETE FROM notification_log WHERE cycle_event_id = ?", (event_id,))
+    conn.commit()
+    return True, None
+    return True
+
+
 def get_settings(conn: sqlite3.Connection) -> dict:
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     return {row["key"]: row["value"] for row in rows}
