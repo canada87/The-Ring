@@ -1,4 +1,4 @@
-const CACHE_NAME = "the-ring-shell-v1";
+const CACHE_NAME = "the-ring-shell-v2";
 const SHELL_ASSETS = [
   "/",
   "/style.css",
@@ -29,10 +29,16 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) {
     return; // never cache API calls
   }
+  // Network-first so new deploys show up immediately; cache is the offline fallback.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).catch(() => cached);
-    })
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok && event.request.method === "GET") {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
