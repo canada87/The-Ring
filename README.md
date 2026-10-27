@@ -12,6 +12,17 @@ L'app sarà disponibile su `http://<ip-host>:8000`. Nessuna autenticazione: la s
 
 I dati (SQLite) sono persistiti in `./data/ring.db` (montato come volume).
 
+### Immagine pronta (GitHub Container Registry)
+
+Ad ogni push di un tag `v*` (es. `v1.0.0`) una GitHub Action costruisce l'immagine Docker e la pubblica su `ghcr.io/canada87/the-ring`, con i tag `1.0.0`, `1.0` e `latest`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Per usarla al posto della build locale, in `docker-compose.yml` sostituisci `build: .` con `image: ghcr.io/canada87/the-ring:latest`.
+
 ## Primo utilizzo
 
 Alla prima apertura l'app chiede la data/ora di inserimento dell'anello attualmente in uso. Da lì calcola automaticamente:
