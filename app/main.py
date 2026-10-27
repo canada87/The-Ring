@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24,6 +24,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="The Ring", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def revalidate_static(request: Request, call_next):
+    # Without an explicit policy browsers heuristically reuse old CSS/JS after a deploy.
+    # "no-cache" still allows 304 responses via the ETag StaticFiles already sends.
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 class RingActionRequest(BaseModel):

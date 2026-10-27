@@ -1,8 +1,8 @@
-const CACHE_NAME = "the-ring-shell-v2";
+const CACHE_NAME = "the-ring-shell-v3";
 const SHELL_ASSETS = [
   "/",
-  "/style.css",
-  "/app.js",
+  "/style.css?v=3",
+  "/app.js?v=3",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -10,7 +10,10 @@ const SHELL_ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
+    caches.open(CACHE_NAME).then((cache) =>
+      // "reload" skips the HTTP cache so a stale copy never lands in the new shell cache.
+      cache.addAll(SHELL_ASSETS.map((url) => new Request(url, { cache: "reload" })))
+    )
   );
   self.skipWaiting();
 });
@@ -30,8 +33,9 @@ self.addEventListener("fetch", (event) => {
     return; // never cache API calls
   }
   // Network-first so new deploys show up immediately; cache is the offline fallback.
+  // "no-cache" revalidates with the server instead of trusting the browser's HTTP cache.
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-cache" })
       .then((res) => {
         if (res.ok && event.request.method === "GET") {
           const copy = res.clone();
