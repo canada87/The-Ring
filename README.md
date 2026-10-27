@@ -23,6 +23,10 @@ I bottoni "Ho tolto l'anello" / "Ho inserito il nuovo anello" registrano l'event
 
 ## Notifiche
 
+Dalle Impostazioni si sceglie il canale: **ntfy** (notifica push) oppure **email**.
+
+### ntfy
+
 Per default viene generato un topic ntfy casuale sul server pubblico `https://ntfy.sh` (visibile/modificabile in Impostazioni). Per riceverle:
 
 1. Installa l'app **ntfy** su smartphone (Android/iOS).
@@ -30,7 +34,20 @@ Per default viene generato un topic ntfy casuale sul server pubblico `https://nt
 
 Il server ntfy (anche self-hosted) e il topic sono modificabili in qualsiasi momento dalle Impostazioni.
 
-Promemoria inviati:
+### Email
+
+Le credenziali SMTP si configurano solo lato server, tramite variabili d'ambiente (non vengono salvate nel database né esposte dalle API). Copia `.env.example` in `.env`, compila i valori e riavvia:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Poi, in Impostazioni, scegli il canale "Email", inserisci l'indirizzo destinatario e premi "Invia test".
+
+### Promemoria
+
+Promemoria inviati (su qualunque canale):
 
 - 2 giorni prima della scadenza.
 - 1 giorno prima della scadenza.
@@ -51,3 +68,4 @@ Variabili d'ambiente:
 
 - `RING_DB_PATH` (default `/data/ring.db`)
 - `RING_TZ` (default `Europe/Rome`)
+- `RING_SMTP_HOST`, `RING_SMTP_PORT` (default `587`), `RING_SMTP_USER`, `RING_SMTP_PASSWORD`, `RING_SMTP_FROM` (default: `RING_SMTP_USER`), `RING_SMTP_SECURITY` (`starttls` | `ssl` | `none`, default `starttls`) — necessarie solo per le notifiche email

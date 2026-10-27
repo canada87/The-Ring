@@ -3,9 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from . import config, logic
+from . import config, logic, notify
 from .db import get_connection, parse_iso
-from .ntfy import send_ntfy
 
 logger = logging.getLogger("ring.scheduler")
 
@@ -34,9 +33,7 @@ async def check_and_notify() -> None:
         if settings.get("notifications_enabled") != "1":
             return
 
-        server = settings.get("ntfy_server") or config.DEFAULT_NTFY_SERVER
-        topic = settings.get("ntfy_topic")
-        if not topic:
+        if notify.not_ready_reason(settings):
             return
 
         status = logic.compute_status(conn)
@@ -61,7 +58,9 @@ async def check_and_notify() -> None:
                         f"{verb} {days_before} {_plural_days(days_before)} per "
                         f"{action_label}."
                     )
-                    await send_ntfy(server, topic, title, message, priority="default", tags=["ring"])
+                    await notify.send_notification(
+                        settings, title, message, priority="default", tags=["ring"]
+                    )
                     logic.log_notification(conn, cycle_event_id, kind)
         else:
             last_overtime = logic.last_notification_at(conn, cycle_event_id, "overtime")
@@ -70,7 +69,9 @@ async def check_and_notify() -> None:
                 overdue = now - due_at
                 title = "Anello in ritardo"
                 message = f"E' in ritardo da {_format_overdue(overdue)}: {action_label}!"
-                await send_ntfy(server, topic, title, message, priority="high", tags=["warning", "ring"])
+                await notify.send_notification(
+                    settings, title, message, priority="high", tags=["warning", "ring"]
+                )
                 logic.log_notification(conn, cycle_event_id, "overtime")
     except Exception:
         logger.exception("check_and_notify failed")

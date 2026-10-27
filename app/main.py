@@ -6,9 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import logic
+from . import logic, mailer, notify
 from .db import get_connection, init_db
-from .ntfy import send_ntfy
 from .scheduler import create_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +39,16 @@ class SettingsUpdateRequest(BaseModel):
     ntfy_server: Optional[str] = None
     ntfy_topic: Optional[str] = None
     notifications_enabled: Optional[bool] = None
+    notification_channel: Optional[Literal["ntfy", "email"]] = None
+    email_to: Optional[str] = None
+
+
+def _public_settings(conn) -> dict:
+    settings = logic.get_settings(conn)
+    settings["notifications_enabled"] = settings.get("notifications_enabled") == "1"
+    settings["notification_channel"] = notify.channel_of(settings)
+    settings["email_configured"] = mailer.is_configured()
+    return settings
 
 
 @app.get("/api/status")
@@ -118,9 +127,7 @@ def api_edit_event(event_id: int, body: EventEditRequest):
 def api_get_settings():
     conn = get_connection()
     try:
-        settings = logic.get_settings(conn)
-        settings["notifications_enabled"] = settings.get("notifications_enabled") == "1"
-        return settings
+        return _public_settings(conn)
     finally:
         conn.close()
 
@@ -136,10 +143,15 @@ def api_update_settings(body: SettingsUpdateRequest):
             values["ntfy_topic"] = body.ntfy_topic.strip()
         if body.notifications_enabled is not None:
             values["notifications_enabled"] = "1" if body.notifications_enabled else "0"
+        if body.notification_channel is not None:
+            values["notification_channel"] = body.notification_channel
+        if body.email_to is not None:
+            email_to = body.email_to.strip()
+            if email_to and ("@" not in email_to or any(c.isspace() or c in ",;" for c in email_to)):
+                raise HTTPException(status_code=422, detail="Indirizzo email non valido.")
+            values["email_to"] = email_to
         logic.update_settings(conn, values)
-        settings = logic.get_settings(conn)
-        settings["notifications_enabled"] = settings.get("notifications_enabled") == "1"
-        return settings
+        return _public_settings(conn)
     finally:
         conn.close()
 
@@ -152,15 +164,13 @@ async def api_test_notification():
     finally:
         conn.close()
 
-    server = settings.get("ntfy_server")
-    topic = settings.get("ntfy_topic")
-    if not server or not topic:
-        raise HTTPException(status_code=400, detail="Server o topic ntfy non configurati.")
+    reason = notify.not_ready_reason(settings)
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
 
     try:
-        await send_ntfy(
-            server,
-            topic,
+        await notify.send_notification(
+            settings,
             "Test - The Ring",
             "Se leggi questo messaggio, le notifiche funzionano correttamente.",
             priority="default",

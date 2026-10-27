@@ -73,15 +73,40 @@
       <h2>Impostazioni</h2>
 
       <div class="card">
-        <h3>Notifiche ntfy</h3>
+        <h3>Notifiche</h3>
         <label class="field">
-          <span>Server ntfy</span>
-          <input type="text" id="settings-server" placeholder="https://ntfy.sh" />
+          <span>Canale</span>
+          <select id="settings-channel">
+            <option value="ntfy">ntfy (notifica push)</option>
+            <option value="email">Email</option>
+          </select>
         </label>
-        <label class="field">
-          <span>Topic</span>
-          <input type="text" id="settings-topic" placeholder="anello-xxxxx" />
-        </label>
+
+        <div id="settings-ntfy-fields">
+          <label class="field">
+            <span>Server ntfy</span>
+            <input type="text" id="settings-server" placeholder="https://ntfy.sh" />
+          </label>
+          <label class="field">
+            <span>Topic</span>
+            <input type="text" id="settings-topic" placeholder="anello-xxxxx" />
+          </label>
+          <p class="hint">
+            Apri l'app <strong>ntfy</strong> sul telefono e iscriviti al topic indicato sopra
+            (server predefinito: ntfy.sh) per ricevere i promemoria.
+          </p>
+        </div>
+
+        <div id="settings-email-fields" class="hidden">
+          <label class="field">
+            <span>Indirizzo email</span>
+            <input type="email" id="settings-email" placeholder="nome@esempio.it" />
+          </label>
+          <p id="settings-email-hint" class="hint">
+            I promemoria arrivano a questo indirizzo.
+          </p>
+        </div>
+
         <label class="field field-row">
           <span>Notifiche attive</span>
           <input type="checkbox" id="settings-enabled" />
@@ -91,10 +116,6 @@
           <button id="settings-test" class="btn btn-secondary">Invia test</button>
         </div>
         <p id="settings-feedback" class="feedback"></p>
-        <p class="hint">
-          Apri l'app <strong>ntfy</strong> sul telefono e iscriviti al topic indicato sopra
-          (server predefinito: ntfy.sh) per ricevere i promemoria.
-        </p>
       </div>
     </section>
   </main>

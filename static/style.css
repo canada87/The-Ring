@@ -108,7 +108,13 @@ main {
   color: var(--text-muted);
 }
 
+.card div.hidden {
+  display: none;
+}
+
 .field input[type="text"],
+.field input[type="email"],
+.field select,
 .field input[type="datetime-local"] {
   font-size: 1rem;
   padding: 10px 12px;

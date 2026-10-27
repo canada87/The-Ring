@@ -286,9 +286,25 @@ async function loadSettings() {
   el("settings-server").value = s.ntfy_server || "";
   el("settings-topic").value = s.ntfy_topic || "";
   el("settings-enabled").checked = !!s.notifications_enabled;
+  el("settings-email").value = s.email_to || "";
+  el("settings-channel").value = s.notification_channel || "ntfy";
+  state.emailConfigured = !!s.email_configured;
+  renderChannelFields();
 }
 
-el("settings-save").addEventListener("click", async () => {
+function renderChannelFields() {
+  const isEmail = el("settings-channel").value === "email";
+  el("settings-ntfy-fields").classList.toggle("hidden", isEmail);
+  el("settings-email-fields").classList.toggle("hidden", !isEmail);
+  el("settings-email-hint").textContent = state.emailConfigured
+    ? "I promemoria arrivano a questo indirizzo."
+    : "Il server SMTP non è configurato: imposta le variabili RING_SMTP_* sul server (vedi README).";
+}
+
+el("settings-channel").addEventListener("change", renderChannelFields);
+
+// Returns true if the settings were saved; shows the error otherwise.
+async function saveSettings() {
   const feedback = el("settings-feedback");
   feedback.textContent = "";
   feedback.className = "feedback";
@@ -296,6 +312,8 @@ el("settings-save").addEventListener("click", async () => {
     ntfy_server: el("settings-server").value.trim(),
     ntfy_topic: el("settings-topic").value.trim(),
     notifications_enabled: el("settings-enabled").checked,
+    notification_channel: el("settings-channel").value,
+    email_to: el("settings-email").value.trim(),
   };
   const res = await fetch("/api/settings", {
     method: "PUT",
@@ -305,13 +323,20 @@ el("settings-save").addEventListener("click", async () => {
   if (res.ok) {
     feedback.textContent = "Impostazioni salvate.";
     feedback.className = "feedback ok";
-  } else {
-    feedback.textContent = "Errore nel salvataggio.";
-    feedback.className = "feedback error";
+    return true;
   }
-});
+  const err = await res.json().catch(() => ({}));
+  feedback.textContent =
+    typeof err.detail === "string" ? err.detail : "Errore nel salvataggio.";
+  feedback.className = "feedback error";
+  return false;
+}
+
+el("settings-save").addEventListener("click", saveSettings);
 
 el("settings-test").addEventListener("click", async () => {
+  // Test with what is on screen, not with the previously saved channel.
+  if (!(await saveSettings())) return;
   const feedback = el("settings-feedback");
   feedback.textContent = "Invio in corso...";
   feedback.className = "feedback";

@@ -11,3 +11,10 @@ services:
       - TZ=Europe/Rome
       - RING_DB_PATH=/data/ring.db
       - RING_TZ=Europe/Rome
+      # Optional SMTP settings for email notifications (values read from .env)
+      - RING_SMTP_HOST=${RING_SMTP_HOST:-}
+      - RING_SMTP_PORT=${RING_SMTP_PORT:-587}
+      - RING_SMTP_USER=${RING_SMTP_USER:-}
+      - RING_SMTP_PASSWORD=${RING_SMTP_PASSWORD:-}
+      - RING_SMTP_FROM=${RING_SMTP_FROM:-}
+      - RING_SMTP_SECURITY=${RING_SMTP_SECURITY:-starttls}

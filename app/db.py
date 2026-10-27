@@ -30,6 +30,8 @@ CREATE INDEX IF NOT EXISTS idx_notification_log_cycle ON notification_log(cycle_
 DEFAULT_SETTINGS = {
     "ntfy_server": config.DEFAULT_NTFY_SERVER,
     "notifications_enabled": "1",
+    "notification_channel": "ntfy",
+    "email_to": "",
 }
 
 
