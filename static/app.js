@@ -297,7 +297,7 @@ function renderChannelFields() {
   el("settings-ntfy-fields").classList.toggle("hidden", isEmail);
   el("settings-email-fields").classList.toggle("hidden", !isEmail);
   el("settings-email-hint").textContent = state.emailConfigured
-    ? "I promemoria arrivano a questo indirizzo."
+    ? "I promemoria arrivano a questi indirizzi. Separa più indirizzi con una virgola (massimo 10)."
     : "Il server SMTP non è configurato: imposta le variabili RING_SMTP_* sul server (vedi README).";
 }
 

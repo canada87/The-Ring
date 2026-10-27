@@ -54,7 +54,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Poi, in Impostazioni, scegli il canale "Email", inserisci l'indirizzo destinatario e premi "Invia test".
+Poi, in Impostazioni, scegli il canale "Email", inserisci l'indirizzo destinatario e premi "Invia test". Si possono indicare più destinatari separati da virgola (massimo 10): ricevono tutti la stessa email e vedono gli altri indirizzi.
 
 ### Promemoria
 

@@ -146,10 +146,11 @@ def api_update_settings(body: SettingsUpdateRequest):
         if body.notification_channel is not None:
             values["notification_channel"] = body.notification_channel
         if body.email_to is not None:
-            email_to = body.email_to.strip()
-            if email_to and ("@" not in email_to or any(c.isspace() or c in ",;" for c in email_to)):
-                raise HTTPException(status_code=422, detail="Indirizzo email non valido.")
-            values["email_to"] = email_to
+            try:
+                recipients = mailer.parse_recipients(body.email_to)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            values["email_to"] = ", ".join(recipients)
         logic.update_settings(conn, values)
         return _public_settings(conn)
     finally:

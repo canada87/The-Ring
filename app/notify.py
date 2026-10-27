@@ -16,7 +16,7 @@ def not_ready_reason(settings: dict) -> Optional[str]:
     if channel_of(settings) == "email":
         if not mailer.is_configured():
             return "Server SMTP non configurato (variabili RING_SMTP_*)."
-        if not settings.get("email_to"):
+        if not mailer.parse_recipients_safe(settings.get("email_to", "")):
             return "Indirizzo email non configurato."
         return None
     if not (settings.get("ntfy_server") or config.DEFAULT_NTFY_SERVER):
@@ -34,7 +34,8 @@ async def send_notification(
     tags: Optional[list[str]] = None,
 ) -> None:
     if channel_of(settings) == "email":
-        await mailer.send_email(settings["email_to"], title, message)
+        recipients = mailer.parse_recipients_safe(settings.get("email_to", ""))
+        await mailer.send_email(recipients, title, message)
         return
     server = settings.get("ntfy_server") or config.DEFAULT_NTFY_SERVER
     await send_ntfy(server, settings["ntfy_topic"], title, message, priority=priority, tags=tags)
