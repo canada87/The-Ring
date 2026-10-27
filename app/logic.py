@@ -20,6 +20,8 @@ def compute_status(conn: sqlite3.Connection) -> dict:
         return {
             "phase": "setup_required",
             "now": now.isoformat(),
+            "wear_days": config.WEAR_DAYS,
+            "rest_days": config.REST_DAYS,
         }
 
     started_at = parse_iso(last["at"])
@@ -57,6 +59,27 @@ def add_event(conn: sqlite3.Connection, event_type: str, at: Optional[str] = Non
     )
     conn.commit()
     return cur.lastrowid
+
+
+FUTURE_TOLERANCE = timedelta(minutes=5)
+
+
+def validate_new_event_time(conn: sqlite3.Connection, at: str) -> Optional[str]:
+    """Return an error message if `at` can't be the time of the next event."""
+    try:
+        new_dt = parse_iso(at)
+    except ValueError:
+        return "Data non valida."
+    if new_dt.tzinfo is None:
+        new_dt = new_dt.replace(tzinfo=timezone.utc)
+
+    if new_dt > datetime.now(timezone.utc) + FUTURE_TOLERANCE:
+        return "L'orario non può essere nel futuro."
+
+    last = get_last_event(conn)
+    if last is not None and new_dt <= parse_iso(last["at"]):
+        return "L'orario deve essere successivo all'ultimo evento registrato."
+    return None
 
 
 def get_history(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:

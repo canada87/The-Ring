@@ -24,6 +24,13 @@
   --toast-action: #f2b8d4;
   --radius: 20px;
   --tap: 44px;
+  --nav-h: 72px;
+  --fs-xs: 0.8rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.4rem;
+  --fs-display: 2.6rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -99,16 +106,16 @@ h2:focus {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
 }
 
 .topbar {
-  padding: 20px 20px 8px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  padding: 16px 16px 8px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
 }
 
 .topbar h1 {
-  font-size: 1.4rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   margin: 0;
   letter-spacing: 0.02em;
@@ -143,9 +150,9 @@ main {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 16px;
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -157,9 +164,9 @@ main {
 .field input[type="email"],
 .field select,
 .field input[type="datetime-local"] {
-  font-size: 1rem;
+  font-size: var(--fs-md);
   min-height: var(--tap);
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--text-muted);
   background: var(--bg);
@@ -188,7 +195,7 @@ main {
   border-radius: 14px;
   min-height: var(--tap);
   padding: 12px 20px;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s ease, opacity 0.2s ease;
@@ -216,12 +223,12 @@ main {
 
 .btn-large {
   padding: 16px 20px;
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
 }
 
 .btn-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -292,14 +299,14 @@ main {
 }
 
 .ring-days {
-  font-size: 2.6rem;
+  font-size: var(--fs-display);
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .ring-unit {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-top: 4px;
   text-align: center;
@@ -308,7 +315,7 @@ main {
 
 .phase-label {
   text-align: center;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--accent-2-strong);
   margin-top: 4px;
@@ -316,7 +323,7 @@ main {
 
 .due-date {
   text-align: center;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-bottom: 20px;
 }
@@ -346,23 +353,94 @@ main {
   height: 100%;
 }
 
+/* Full-width lane moved with transform; the marker sits at its left edge. */
 .timeline-cursor {
   position: absolute;
   top: -3px;
-  width: 4px;
+  left: 0;
+  width: 100%;
   height: 20px;
+  pointer-events: none;
+  transition: transform 0.6s ease;
+}
+
+.timeline-cursor::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  margin-left: -2px;
   border-radius: 2px;
   background: var(--text);
-  left: 0%;
-  transition: left 0.6s ease;
 }
 
 .timeline-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: 8px;
+}
+
+.when {
+  margin-bottom: 16px;
+}
+
+.when summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.when-options {
+  display: flex;
+  gap: 8px;
+  border: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.pill {
+  flex: 1;
+  position: relative;
+}
+
+.pill input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.pill span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 8px;
+  border-radius: 12px;
+  border: 1px solid var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+}
+
+.pill input:checked + span {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.pill input:focus-visible + span {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 2px;
 }
 
 .history-list {
@@ -376,9 +454,9 @@ main {
   background: var(--card-bg);
   border-radius: 14px;
   padding: 12px 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   box-shadow: var(--shadow);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
 
 .history-list li.history-empty {
@@ -405,9 +483,9 @@ main {
 
 .history-list .tag {
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 10px;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
 }
 
 .history-list .tag.insert {
@@ -424,7 +502,7 @@ main {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   text-decoration: underline;
   padding: 0 8px;
@@ -449,29 +527,29 @@ main {
 
 .history-edit input[type="datetime-local"] {
   width: 100%;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   min-height: var(--tap);
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--text-muted);
   background: var(--bg);
   color: var(--text);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .btn-small {
-  padding: 8px 14px;
-  font-size: 0.85rem;
+  padding: 8px 16px;
+  font-size: var(--fs-sm);
 }
 
 .hint {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   margin-top: 8px;
 }
 
 .feedback {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   min-height: 1.2em;
 }
 
@@ -509,19 +587,34 @@ main {
   background: var(--card-bg);
   box-shadow: var(--nav-shadow);
   border-radius: var(--radius) var(--radius) 0 0;
-  padding: 10px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom, 0px));
   z-index: 10;
+}
+
+.nav-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .nav-btn {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
-  min-height: 48px;
-  padding: 8px 12px;
+  min-height: 56px;
+  padding: 6px 8px;
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
@@ -552,7 +645,7 @@ main {
   position: fixed;
   left: 16px;
   right: 16px;
-  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
   max-width: 448px;
   margin: 0 auto;
   display: flex;
@@ -564,7 +657,7 @@ main {
   background: var(--toast-bg);
   color: var(--toast-text);
   box-shadow: var(--shadow);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
   z-index: 20;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
@@ -586,7 +679,7 @@ main {
   border: none;
   color: var(--toast-action);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
   min-height: var(--tap);
   padding: 0 8px;
   cursor: pointer;

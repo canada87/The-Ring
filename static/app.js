@@ -12,6 +12,8 @@ const state = {
   offline: false,
   busy: false,
   emailConfigured: false,
+  view: null,
+  settingsDirty: false,
 };
 
 // Skip redundant writes so live regions don't re-announce unchanged text.
@@ -92,6 +94,15 @@ function setBusy(busy) {
 // ---------- Navigation ----------
 
 function switchView(name, { focus = false } = {}) {
+  // Leaving the settings with edits that were never saved: save them instead of dropping them.
+  if (state.view === "settings" && name !== "settings" && state.settingsDirty) {
+    saveSettings().then((ok) =>
+      showToast(ok ? "Impostazioni salvate." : "Modifiche alle impostazioni non salvate.", {
+        kind: ok ? "info" : "error",
+      })
+    );
+  }
+  state.view = name;
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
   document.querySelectorAll(".nav-btn").forEach((b) => {
     b.classList.remove("active");
@@ -109,9 +120,28 @@ function switchView(name, { focus = false } = {}) {
   if (name === "settings") loadSettings();
 }
 
+// Each view has its own URL hash, so deep links work and Back steps through the views.
+const VIEW_HASHES = { dashboard: "dashboard", history: "storico", settings: "impostazioni" };
+
+function viewFromHash() {
+  const hash = location.hash.slice(1);
+  return Object.keys(VIEW_HASHES).find((name) => VIEW_HASHES[name] === hash) || "dashboard";
+}
+
+function navigate(name) {
+  const hash = `#${VIEW_HASHES[name]}`;
+  if (location.hash === hash) {
+    switchView(name, { focus: true });
+  } else {
+    location.hash = hash;
+  }
+}
+
 document.querySelectorAll(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => switchView(btn.dataset.view, { focus: true }));
+  btn.addEventListener("click", () => navigate(btn.dataset.view));
 });
+
+window.addEventListener("hashchange", () => switchView(viewFromHash(), { focus: true }));
 
 // ---------- Dashboard ----------
 
@@ -155,6 +185,12 @@ function renderDashboard() {
   if (!s || s.phase === "setup_required") {
     setupCard.classList.remove("hidden");
     dashCard.classList.add("hidden");
+    if (s && s.wear_days) {
+      setText(
+        el("setup-cycle"),
+        `Il ciclo dura ${s.wear_days + s.rest_days} giorni: ${s.wear_days} con l'anello inserito, poi ${s.rest_days} di pausa.`
+      );
+    }
     return;
   }
 
@@ -233,7 +269,12 @@ function tickDashboard() {
       (wearDays / totalCycleDays) * 100 +
       (Math.min(elapsedDays, restDays) / totalCycleDays) * 100;
   }
-  el("timeline-cursor").style.left = `${Math.min(100, Math.max(0, cursorPct))}%`;
+  el("timeline-cursor").style.transform = `translateX(${Math.min(99.5, Math.max(0.5, cursorPct))}%)`;
+  const wearPct = (wearDays / totalCycleDays) * 100;
+  el("timeline-wear").style.width = `${wearPct}%`;
+  el("timeline-rest").style.width = `${100 - wearPct}%`;
+  setText(el("timeline-wear-label"), `${wearDays} giorni dentro`);
+  setText(el("timeline-rest-label"), `${restDays} giorni fuori`);
 
   setText(
     el("action-btn"),
@@ -241,17 +282,79 @@ function tickDashboard() {
   );
 }
 
+const FUTURE_TOLERANCE_MS = 5 * 60000;
+
+// Reads the "when" picker: { at: Date|null } (null = server time) or { error }.
+function chosenTime() {
+  const mode = document.querySelector('input[name="when"]:checked').value;
+  if (mode === "now") return { at: null };
+
+  let at;
+  if (mode === "yesterday") {
+    at = new Date(Date.now() - 86400000);
+  } else {
+    const value = el("when-custom").value;
+    if (!value) return { error: "Seleziona data e ora." };
+    at = new Date(value);
+  }
+
+  if (at.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
+    return { error: "L'orario non può essere nel futuro." };
+  }
+  const s = state.status;
+  if (s && s.cycle_started_at && at <= new Date(s.cycle_started_at)) {
+    return {
+      error: `L'orario deve essere successivo all'ultimo evento (${fmtDateTime(s.cycle_started_at)}).`,
+    };
+  }
+  return { at };
+}
+
+function updateWhenPreview() {
+  const mode = document.querySelector('input[name="when"]:checked').value;
+  el("when-custom-field").classList.toggle("hidden", mode !== "custom");
+  if (mode === "custom" && !el("when-custom").value) {
+    el("when-custom").value = toLocalInputValue(new Date().toISOString());
+  }
+  el("when-error").textContent = "";
+  el("when-custom").removeAttribute("aria-invalid");
+  const { at } = chosenTime();
+  el("when-preview").textContent = at ? `Verrà registrato: ${fmtDateTime(at.toISOString())}` : "";
+}
+
+function resetWhenPicker() {
+  document.querySelector('input[name="when"][value="now"]').checked = true;
+  el("when-custom").value = "";
+  el("when-details").open = false;
+  updateWhenPreview();
+}
+
+document.querySelectorAll('input[name="when"]').forEach((r) => {
+  r.addEventListener("change", updateWhenPreview);
+});
+el("when-custom").addEventListener("input", updateWhenPreview);
+
 el("action-btn").addEventListener("click", () => {
   const s = state.status;
-  if (s && s.next_action) submitAction(s.next_action);
+  if (!s || !s.next_action) return;
+  const when = chosenTime();
+  if (when.error) {
+    el("when-details").open = true;
+    el("when-error").textContent = when.error;
+    el("when-custom").setAttribute("aria-invalid", "true");
+    return;
+  }
+  submitAction(s.next_action, when.at);
 });
 
-async function submitAction(type) {
+async function submitAction(type, at = null) {
   if (state.busy) return;
   setBusy(true);
   try {
-    const data = await api("/api/ring/action", jsonRequest("POST", { type }));
+    const body = at ? { type, at: at.toISOString() } : { type };
+    const data = await api("/api/ring/action", jsonRequest("POST", body));
     state.status = data.status;
+    resetWhenPicker();
     renderDashboard();
     showToast(type === "remove" ? "Anello tolto: registrato." : "Anello inserito: registrato.", {
       actionLabel: "Annulla",
@@ -477,6 +580,8 @@ async function loadSettings() {
   el("settings-email").value = s.email_to || "";
   el("settings-channel").value = s.notification_channel || "ntfy";
   state.emailConfigured = !!s.email_configured;
+  state.settingsDirty = false;
+  el("settings-feedback").textContent = "";
   renderChannelFields();
 }
 
@@ -490,6 +595,16 @@ function renderChannelFields() {
 }
 
 el("settings-channel").addEventListener("change", renderChannelFields);
+
+["input", "change"].forEach((evt) => {
+  el("view-settings").addEventListener(evt, (e) => {
+    if (e.target.closest("#settings-copy-topic")) return;
+    state.settingsDirty = true;
+    const feedback = el("settings-feedback");
+    feedback.textContent = "Modifiche non salvate.";
+    feedback.className = "feedback";
+  });
+});
 
 // The page may be served over plain http (e.g. a Tailscale IP), where the async clipboard API is unavailable.
 async function copyText(text, inputEl) {
@@ -541,6 +656,7 @@ async function saveSettings() {
   };
   try {
     await api("/api/settings", jsonRequest("PUT", body));
+    state.settingsDirty = false;
     feedback.textContent = "Impostazioni salvate.";
     feedback.className = "feedback ok";
     return true;
@@ -596,6 +712,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+switchView(viewFromHash());
 showLoadCard("Caricamento…");
 fetchStatus();
 setInterval(fetchStatus, POLL_MS);

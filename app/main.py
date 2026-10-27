@@ -90,6 +90,11 @@ def api_ring_action(body: RingActionRequest):
                 detail="Al primo utilizzo devi registrare l'inserimento dell'anello.",
             )
 
+        if body.at is not None:
+            error = logic.validate_new_event_time(conn, body.at)
+            if error:
+                raise HTTPException(status_code=422, detail=error)
+
         event_id = logic.add_event(conn, body.type, at=body.at)
         return {"id": event_id, "status": logic.compute_status(conn)}
     finally:
