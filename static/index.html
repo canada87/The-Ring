@@ -20,22 +20,30 @@
   </header>
 
   <main>
-    <section id="view-dashboard" class="view">
+    <section id="view-dashboard" class="view" aria-labelledby="title-dashboard">
+      <h2 id="title-dashboard" class="sr-only" tabindex="-1">Dashboard</h2>
+
+      <div id="load-card" class="card load-card">
+        <p id="load-message" role="status">Caricamento…</p>
+        <button id="load-retry" class="btn btn-secondary hidden">Riprova</button>
+      </div>
+
       <div id="setup-card" class="card hidden">
         <h2>Primo utilizzo</h2>
         <p>Registra quando hai inserito l'anello attualmente in uso per iniziare a tracciare il ciclo.</p>
         <label class="field">
           <span>Data e ora di inserimento</span>
-          <input type="datetime-local" id="setup-datetime" />
+          <input type="datetime-local" id="setup-datetime" aria-describedby="setup-error" />
         </label>
+        <p id="setup-error" class="feedback error" role="alert"></p>
         <button id="setup-submit" class="btn btn-primary">Inizia a tracciare</button>
       </div>
 
       <div id="dashboard-card" class="card hidden">
-        <div id="overtime-banner" class="banner hidden"></div>
+        <div id="overtime-banner" class="banner hidden" role="status"></div>
 
         <div class="ring-wrap">
-          <svg viewBox="0 0 200 200" class="progress-ring">
+          <svg viewBox="0 0 200 200" class="progress-ring" aria-hidden="true">
             <circle class="progress-ring__bg" cx="100" cy="100" r="88" />
             <circle id="progress-ring__value" class="progress-ring__value" cx="100" cy="100" r="88" />
           </svg>
@@ -49,7 +57,7 @@
         <div id="due-date" class="due-date"></div>
 
         <div class="timeline">
-          <div class="timeline-track">
+          <div class="timeline-track" aria-hidden="true">
             <div id="timeline-wear" class="timeline-segment timeline-wear"></div>
             <div id="timeline-rest" class="timeline-segment timeline-rest"></div>
             <div id="timeline-cursor" class="timeline-cursor"></div>
@@ -64,13 +72,13 @@
       </div>
     </section>
 
-    <section id="view-history" class="view hidden">
-      <h2>Storico</h2>
+    <section id="view-history" class="view hidden" aria-labelledby="title-history">
+      <h2 id="title-history" tabindex="-1">Storico</h2>
       <ul id="history-list" class="history-list"></ul>
     </section>
 
-    <section id="view-settings" class="view hidden">
-      <h2>Impostazioni</h2>
+    <section id="view-settings" class="view hidden" aria-labelledby="title-settings">
+      <h2 id="title-settings" tabindex="-1">Impostazioni</h2>
 
       <div class="card">
         <h3>Notifiche</h3>
@@ -94,6 +102,7 @@
           <p class="hint">
             Apri l'app <strong>ntfy</strong> sul telefono e iscriviti al topic indicato sopra
             (server predefinito: ntfy.sh) per ricevere i promemoria.
+            <button type="button" id="settings-copy-topic" class="link-btn">Copia topic</button>
           </p>
         </div>
 
@@ -115,16 +124,21 @@
           <button id="settings-save" class="btn btn-primary">Salva</button>
           <button id="settings-test" class="btn btn-secondary">Invia test</button>
         </div>
-        <p id="settings-feedback" class="feedback"></p>
+        <p id="settings-feedback" class="feedback" role="status" aria-live="polite"></p>
       </div>
     </section>
   </main>
 
-  <nav class="bottom-nav">
-    <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+  <nav class="bottom-nav" aria-label="Navigazione principale">
+    <button class="nav-btn active" data-view="dashboard" aria-current="page">Dashboard</button>
     <button class="nav-btn" data-view="history">Storico</button>
     <button class="nav-btn" data-view="settings">Impostazioni</button>
   </nav>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true">
+    <span id="toast-message"></span>
+    <button type="button" id="toast-action" class="toast-action hidden"></button>
+  </div>
 </div>
 
 <script src="/app.js"></script>

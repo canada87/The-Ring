@@ -1,12 +1,23 @@
 const CIRCUMFERENCE = 2 * Math.PI * 88;
 const POLL_MS = 30000;
 const TICK_MS = 1000;
+const TOAST_MS = 5000;
+const UNDO_TOAST_MS = 6000;
 
 const el = (id) => document.getElementById(id);
 
 const state = {
   status: null,
+  loaded: false,
+  offline: false,
+  busy: false,
+  emailConfigured: false,
 };
+
+// Skip redundant writes so live regions don't re-announce unchanged text.
+function setText(node, text) {
+  if (node.textContent !== text) node.textContent = text;
+}
 
 function fmtDateTime(iso) {
   const d = new Date(iso);
@@ -19,29 +30,127 @@ function fmtDateTime(iso) {
   }).format(d);
 }
 
-function switchView(name) {
+function jsonRequest(method, body) {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+// Resolves with the parsed body, rejects with an Error carrying a user-facing message.
+async function api(path, options) {
+  let res;
+  try {
+    res = await fetch(path, options);
+  } catch {
+    throw new Error("Connessione al server assente.");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(typeof err.detail === "string" ? err.detail : "Errore del server.");
+  }
+  return res.json();
+}
+
+// ---------- Toast ----------
+
+let toastTimer = null;
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  el("toast").classList.add("hidden");
+}
+
+function showToast(message, { kind = "info", actionLabel, onAction, duration = TOAST_MS } = {}) {
+  const action = el("toast-action");
+  clearTimeout(toastTimer);
+  el("toast-message").textContent = message;
+  el("toast").classList.toggle("error", kind === "error");
+  if (actionLabel && onAction) {
+    action.textContent = actionLabel;
+    action.classList.remove("hidden");
+    action.onclick = () => {
+      hideToast();
+      onAction();
+    };
+  } else {
+    action.classList.add("hidden");
+    action.onclick = null;
+  }
+  el("toast").classList.remove("hidden");
+  toastTimer = setTimeout(hideToast, duration);
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  document.querySelectorAll("#action-btn, #setup-submit").forEach((b) => {
+    b.disabled = busy;
+  });
+}
+
+// ---------- Navigation ----------
+
+function switchView(name, { focus = false } = {}) {
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach((b) => {
+    b.classList.remove("active");
+    b.removeAttribute("aria-current");
+  });
   el(`view-${name}`).classList.remove("hidden");
-  document.querySelector(`.nav-btn[data-view="${name}"]`).classList.add("active");
+  const btn = document.querySelector(`.nav-btn[data-view="${name}"]`);
+  btn.classList.add("active");
+  btn.setAttribute("aria-current", "page");
+  if (focus) {
+    window.scrollTo(0, 0);
+    el(`title-${name}`).focus({ preventScroll: true });
+  }
   if (name === "history") loadHistory();
   if (name === "settings") loadSettings();
 }
 
 document.querySelectorAll(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => switchView(btn.dataset.view));
+  btn.addEventListener("click", () => switchView(btn.dataset.view, { focus: true }));
 });
 
-async function fetchStatus() {
-  const res = await fetch("/api/status");
-  state.status = await res.json();
-  renderDashboard();
+// ---------- Dashboard ----------
+
+function showLoadCard(message, { retry = false } = {}) {
+  el("load-card").classList.remove("hidden");
+  el("setup-card").classList.add("hidden");
+  el("dashboard-card").classList.add("hidden");
+  el("load-message").textContent = message;
+  el("load-retry").classList.toggle("hidden", !retry);
 }
+
+async function fetchStatus() {
+  try {
+    state.status = await api("/api/status");
+    state.loaded = true;
+    state.offline = false;
+    renderDashboard();
+  } catch (e) {
+    if (!state.loaded) {
+      showLoadCard("Impossibile contattare il server.", { retry: true });
+    } else if (!state.offline) {
+      state.offline = true;
+      showToast("Connessione assente: i dati potrebbero non essere aggiornati.", {
+        kind: "error",
+      });
+    }
+  }
+}
+
+el("load-retry").addEventListener("click", () => {
+  showLoadCard("Caricamento…");
+  fetchStatus();
+});
 
 function renderDashboard() {
   const s = state.status;
   const setupCard = el("setup-card");
   const dashCard = el("dashboard-card");
+  el("load-card").classList.add("hidden");
 
   if (!s || s.phase === "setup_required") {
     setupCard.classList.remove("hidden");
@@ -56,7 +165,7 @@ function renderDashboard() {
 
 function tickDashboard() {
   const s = state.status;
-  if (!s || s.phase === "setup_required") return;
+  if (!s || s.phase === "setup_required" || document.hidden) return;
 
   const now = new Date();
   const started = new Date(s.cycle_started_at);
@@ -79,9 +188,10 @@ function tickDashboard() {
   const banner = el("overtime-banner");
   if (overtime) {
     banner.classList.remove("hidden");
-    banner.textContent = `In ritardo: ${actionLabel}`;
+    setText(banner, `In ritardo: ${actionLabel}`);
   } else {
     banner.classList.add("hidden");
+    setText(banner, "");
   }
 
   const ringDays = el("ring-days");
@@ -92,21 +202,23 @@ function tickDashboard() {
   const hours = totalHours % 24;
 
   if (overtime) {
-    ringDays.textContent = days > 0 ? `${days}g ${hours}h` : `${hours}h`;
-    ringUnit.textContent = `in ritardo per ${actionLabel}`;
+    setText(ringDays, days > 0 ? `${days}g ${hours}h` : `${hours}h`);
+    setText(ringUnit, `in ritardo per ${actionLabel}`);
   } else if (days > 0) {
-    ringDays.textContent = `${days}`;
-    ringUnit.textContent = `giorn${days === 1 ? "o" : "i"} per ${actionLabel}`;
+    setText(ringDays, `${days}`);
+    setText(ringUnit, `giorn${days === 1 ? "o" : "i"} per ${actionLabel}`);
   } else {
-    ringDays.textContent = `${hours}`;
-    ringUnit.textContent = `or${hours === 1 ? "a" : "e"} per ${actionLabel}`;
+    setText(ringDays, `${hours}`);
+    setText(ringUnit, `or${hours === 1 ? "a" : "e"} per ${actionLabel}`);
   }
 
-  el("phase-label").textContent =
-    s.phase === "wearing" ? "Anello inserito" : "Anello fuori";
-  el("due-date").textContent = overtime
-    ? `Scadenza superata: ${fmtDateTime(s.due_at)}`
-    : `Scadenza: ${fmtDateTime(s.due_at)}`;
+  setText(el("phase-label"), s.phase === "wearing" ? "Anello inserito" : "Anello fuori");
+  setText(
+    el("due-date"),
+    overtime
+      ? `Scadenza superata: ${fmtDateTime(s.due_at)}`
+      : `Scadenza: ${fmtDateTime(s.due_at)}`
+  );
 
   const wearDays = s.wear_days;
   const restDays = s.rest_days;
@@ -123,49 +235,81 @@ function tickDashboard() {
   }
   el("timeline-cursor").style.left = `${Math.min(100, Math.max(0, cursorPct))}%`;
 
-  const actionBtn = el("action-btn");
-  actionBtn.textContent =
-    s.next_action === "remove" ? "Ho tolto l'anello" : "Ho inserito il nuovo anello";
-  actionBtn.onclick = () => submitAction(s.next_action);
+  setText(
+    el("action-btn"),
+    s.next_action === "remove" ? "Ho tolto l'anello" : "Ho inserito il nuovo anello"
+  );
 }
 
+el("action-btn").addEventListener("click", () => {
+  const s = state.status;
+  if (s && s.next_action) submitAction(s.next_action);
+});
+
 async function submitAction(type) {
-  const res = await fetch("/api/ring/action", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type }),
-  });
-  if (res.ok) {
-    const data = await res.json();
+  if (state.busy) return;
+  setBusy(true);
+  try {
+    const data = await api("/api/ring/action", jsonRequest("POST", { type }));
     state.status = data.status;
     renderDashboard();
-  } else {
-    const err = await res.json().catch(() => ({}));
-    alert(err.detail || "Errore durante il salvataggio.");
+    showToast(type === "remove" ? "Anello tolto: registrato." : "Anello inserito: registrato.", {
+      actionLabel: "Annulla",
+      duration: UNDO_TOAST_MS,
+      onAction: () => deleteEvent(data.id, "Azione annullata."),
+    });
+  } catch (e) {
+    showToast(e.message, { kind: "error" });
+  } finally {
+    setBusy(false);
+  }
+}
+
+// Deletes the most recent event and refreshes the views that depend on it.
+async function deleteEvent(id, doneMessage, { onUndo } = {}) {
+  try {
+    const data = await api(`/api/history/${id}`, { method: "DELETE" });
+    state.status = data.status;
+    renderDashboard();
+    if (!el("view-history").classList.contains("hidden")) loadHistory();
+    showToast(doneMessage, onUndo ? {
+      actionLabel: "Annulla",
+      duration: UNDO_TOAST_MS,
+      onAction: onUndo,
+    } : {});
+  } catch (e) {
+    showToast(e.message, { kind: "error" });
   }
 }
 
 el("setup-submit").addEventListener("click", async () => {
-  const value = el("setup-datetime").value;
-  if (!value) {
-    alert("Seleziona data e ora.");
+  if (state.busy) return;
+  const input = el("setup-datetime");
+  const errorEl = el("setup-error");
+  errorEl.textContent = "";
+  input.removeAttribute("aria-invalid");
+
+  if (!input.value) {
+    errorEl.textContent = "Seleziona data e ora di inserimento.";
+    input.setAttribute("aria-invalid", "true");
+    input.focus();
     return;
   }
-  const at = new Date(value).toISOString();
-  const res = await fetch("/api/ring/action", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "insert", at }),
-  });
-  if (res.ok) {
-    const data = await res.json();
+
+  setBusy(true);
+  try {
+    const at = new Date(input.value).toISOString();
+    const data = await api("/api/ring/action", jsonRequest("POST", { type: "insert", at }));
     state.status = data.status;
     renderDashboard();
-  } else {
-    const err = await res.json().catch(() => ({}));
-    alert(err.detail || "Errore durante il salvataggio.");
+  } catch (e) {
+    errorEl.textContent = e.message;
+  } finally {
+    setBusy(false);
   }
 });
+
+// ---------- History ----------
 
 function toLocalInputValue(iso) {
   const d = new Date(iso);
@@ -176,24 +320,32 @@ function toLocalInputValue(iso) {
 }
 
 async function loadHistory() {
-  const res = await fetch("/api/history?limit=50");
-  const items = await res.json();
+  let items;
+  try {
+    items = await api("/api/history?limit=50");
+  } catch (e) {
+    showToast(e.message, { kind: "error" });
+    return;
+  }
   const list = el("history-list");
   list.innerHTML = "";
   items.forEach((item, idx) => {
     const li = document.createElement("li");
     li.className = "history-item";
 
+    const typeLabel = item.type === "insert" ? "Inserito" : "Tolto";
+    const dateLabel = fmtDateTime(item.at);
+
     const row = document.createElement("div");
     row.className = "history-row";
 
     const tag = document.createElement("span");
     tag.className = `tag ${item.type}`;
-    tag.textContent = item.type === "insert" ? "Inserito" : "Tolto";
+    tag.textContent = typeLabel;
 
     const date = document.createElement("span");
     date.className = "history-date";
-    date.textContent = fmtDateTime(item.at);
+    date.textContent = dateLabel;
 
     const actions = document.createElement("div");
     actions.className = "history-actions";
@@ -201,21 +353,38 @@ async function loadHistory() {
     const editBtn = document.createElement("button");
     editBtn.className = "link-btn";
     editBtn.textContent = "Modifica";
+    editBtn.setAttribute("aria-label", `Modifica evento: ${typeLabel}, ${dateLabel}`);
+    editBtn.setAttribute("aria-expanded", "false");
     actions.appendChild(editBtn);
 
     if (idx === 0) {
-      const undo = document.createElement("button");
-      undo.className = "link-btn";
-      undo.textContent = "Annulla";
-      undo.onclick = async () => {
-        if (!confirm("Annullare l'ultimo evento registrato?")) return;
-        const r = await fetch(`/api/history/${item.id}`, { method: "DELETE" });
-        if (r.ok) {
-          loadHistory();
-          fetchStatus();
-        }
+      const del = document.createElement("button");
+      del.className = "link-btn danger";
+      del.textContent = "Elimina";
+      del.setAttribute("aria-label", `Elimina ultimo evento: ${typeLabel}, ${dateLabel}`);
+      del.onclick = () => {
+        del.disabled = true;
+        deleteEvent(item.id, "Evento eliminato.", {
+          // The deleted event is always the one the backend expects next, so re-adding it restores the state.
+          onUndo: async () => {
+            try {
+              const data = await api(
+                "/api/ring/action",
+                jsonRequest("POST", { type: item.type, at: item.at })
+              );
+              state.status = data.status;
+              renderDashboard();
+              if (!el("view-history").classList.contains("hidden")) loadHistory();
+              showToast("Evento ripristinato.");
+            } catch (e) {
+              showToast(e.message, { kind: "error" });
+            }
+          },
+        }).finally(() => {
+          del.disabled = false;
+        });
       };
-      actions.appendChild(undo);
+      actions.appendChild(del);
     }
 
     row.appendChild(tag);
@@ -229,6 +398,7 @@ async function loadHistory() {
     const input = document.createElement("input");
     input.type = "datetime-local";
     input.value = toLocalInputValue(item.at);
+    input.setAttribute("aria-label", `Nuova data e ora: ${typeLabel}, ${dateLabel}`);
 
     const editBtnRow = document.createElement("div");
     editBtnRow.className = "btn-row";
@@ -239,10 +409,11 @@ async function loadHistory() {
 
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "btn btn-secondary btn-small";
-    cancelBtn.textContent = "Annulla modifica";
+    cancelBtn.textContent = "Annulla";
 
     const errorEl = document.createElement("p");
     errorEl.className = "feedback error";
+    errorEl.setAttribute("role", "alert");
 
     editBtnRow.appendChild(saveBtn);
     editBtnRow.appendChild(cancelBtn);
@@ -251,38 +422,55 @@ async function loadHistory() {
     editForm.appendChild(errorEl);
     li.appendChild(editForm);
 
-    editBtn.onclick = () => {
+    const setEditing = (open) => {
       errorEl.textContent = "";
-      editForm.classList.toggle("hidden");
+      editForm.classList.toggle("hidden", !open);
+      editBtn.setAttribute("aria-expanded", String(open));
+      if (open) input.focus();
     };
-    cancelBtn.onclick = () => editForm.classList.add("hidden");
+
+    editBtn.onclick = () => setEditing(editForm.classList.contains("hidden"));
+    cancelBtn.onclick = () => {
+      setEditing(false);
+      editBtn.focus();
+    };
     saveBtn.onclick = async () => {
       if (!input.value) return;
-      const at = new Date(input.value).toISOString();
-      const r = await fetch(`/api/history/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ at }),
-      });
-      if (r.ok) {
+      saveBtn.disabled = true;
+      errorEl.textContent = "";
+      try {
+        const at = new Date(input.value).toISOString();
+        const data = await api(`/api/history/${item.id}`, jsonRequest("PATCH", { at }));
+        state.status = data.status;
+        renderDashboard();
         loadHistory();
-        fetchStatus();
-      } else {
-        const err = await r.json().catch(() => ({}));
-        errorEl.textContent = err.detail || "Errore nella modifica.";
+        showToast("Evento aggiornato.");
+      } catch (e) {
+        errorEl.textContent = e.message;
+        saveBtn.disabled = false;
       }
     };
 
     list.appendChild(li);
   });
   if (items.length === 0) {
-    list.innerHTML = "<li>Nessun evento registrato.</li>";
+    const empty = document.createElement("li");
+    empty.className = "history-empty";
+    empty.textContent = "Nessun evento registrato. Registra il primo inserimento dalla Dashboard.";
+    list.appendChild(empty);
   }
 }
 
+// ---------- Settings ----------
+
 async function loadSettings() {
-  const res = await fetch("/api/settings");
-  const s = await res.json();
+  let s;
+  try {
+    s = await api("/api/settings");
+  } catch (e) {
+    showToast(e.message, { kind: "error" });
+    return;
+  }
   el("settings-server").value = s.ntfy_server || "";
   el("settings-topic").value = s.ntfy_topic || "";
   el("settings-enabled").checked = !!s.notifications_enabled;
@@ -303,6 +491,42 @@ function renderChannelFields() {
 
 el("settings-channel").addEventListener("change", renderChannelFields);
 
+// The page may be served over plain http (e.g. a Tailscale IP), where the async clipboard API is unavailable.
+async function copyText(text, inputEl) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  inputEl.focus();
+  inputEl.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  }
+}
+
+el("settings-copy-topic").addEventListener("click", async () => {
+  const input = el("settings-topic");
+  if (!input.value.trim()) {
+    showToast("Nessun topic da copiare.", { kind: "error" });
+    return;
+  }
+  const ok = await copyText(input.value.trim(), input);
+  showToast(ok ? "Topic copiato." : "Copia non riuscita: il topic è selezionato, copialo a mano.", {
+    kind: ok ? "info" : "error",
+  });
+});
+
+function setSettingsBusy(busy) {
+  el("settings-save").disabled = busy;
+  el("settings-test").disabled = busy;
+}
+
 // Returns true if the settings were saved; shows the error otherwise.
 async function saveSettings() {
   const feedback = el("settings-feedback");
@@ -315,41 +539,49 @@ async function saveSettings() {
     notification_channel: el("settings-channel").value,
     email_to: el("settings-email").value.trim(),
   };
-  const res = await fetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (res.ok) {
+  try {
+    await api("/api/settings", jsonRequest("PUT", body));
     feedback.textContent = "Impostazioni salvate.";
     feedback.className = "feedback ok";
     return true;
+  } catch (e) {
+    feedback.textContent = e.message;
+    feedback.className = "feedback error";
+    return false;
   }
-  const err = await res.json().catch(() => ({}));
-  feedback.textContent =
-    typeof err.detail === "string" ? err.detail : "Errore nel salvataggio.";
-  feedback.className = "feedback error";
-  return false;
 }
 
-el("settings-save").addEventListener("click", saveSettings);
-
-el("settings-test").addEventListener("click", async () => {
-  // Test with what is on screen, not with the previously saved channel.
-  if (!(await saveSettings())) return;
-  const feedback = el("settings-feedback");
-  feedback.textContent = "Invio in corso...";
-  feedback.className = "feedback";
-  const res = await fetch("/api/settings/test-notification", { method: "POST" });
-  if (res.ok) {
-    feedback.textContent = "Notifica di test inviata.";
-    feedback.className = "feedback ok";
-  } else {
-    const err = await res.json().catch(() => ({}));
-    feedback.textContent = err.detail || "Invio fallito.";
-    feedback.className = "feedback error";
+el("settings-save").addEventListener("click", async () => {
+  setSettingsBusy(true);
+  try {
+    await saveSettings();
+  } finally {
+    setSettingsBusy(false);
   }
 });
+
+el("settings-test").addEventListener("click", async () => {
+  setSettingsBusy(true);
+  try {
+    // Test with what is on screen, not with the previously saved channel.
+    if (!(await saveSettings())) return;
+    const feedback = el("settings-feedback");
+    feedback.textContent = "Impostazioni salvate. Invio del test in corso…";
+    feedback.className = "feedback";
+    try {
+      await api("/api/settings/test-notification", { method: "POST" });
+      feedback.textContent = "Notifica di test inviata.";
+      feedback.className = "feedback ok";
+    } catch (e) {
+      feedback.textContent = e.message;
+      feedback.className = "feedback error";
+    }
+  } finally {
+    setSettingsBusy(false);
+  }
+});
+
+// ---------- Boot ----------
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -357,6 +589,14 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    fetchStatus();
+    tickDashboard();
+  }
+});
+
+showLoadCard("Caricamento…");
 fetchStatus();
 setInterval(fetchStatus, POLL_MS);
 setInterval(tickDashboard, TICK_MS);
