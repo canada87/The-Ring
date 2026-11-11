@@ -3,6 +3,7 @@ const POLL_MS = 30000;
 const TICK_MS = 1000;
 const TOAST_MS = 5000;
 const UNDO_TOAST_MS = 6000;
+const FUTURE_TOLERANCE_MS = 5 * 60000;
 
 const el = (id) => document.getElementById(id);
 
@@ -86,9 +87,11 @@ function showToast(message, { kind = "info", actionLabel, onAction, duration = T
 
 function setBusy(busy) {
   state.busy = busy;
-  document.querySelectorAll("#action-btn, #setup-submit").forEach((b) => {
+  document.querySelectorAll("#action-now, #action-due, #action-custom, #custom-submit, #setup-submit").forEach((b) => {
     b.disabled = busy;
   });
+  // "Alla scadenza" may need to stay disabled even when no longer busy.
+  if (!busy && state.status) tickDashboard();
 }
 
 // ---------- Navigation ----------
@@ -277,27 +280,26 @@ function tickDashboard() {
   setText(el("timeline-rest-label"), `${restDays} giorni fuori`);
 
   setText(
-    el("action-btn"),
-    s.next_action === "remove" ? "Ho tolto l'anello" : "Ho inserito il nuovo anello"
+    el("action-title"),
+    s.next_action === "remove" ? "Ho tolto l'anello:" : "Ho inserito il nuovo anello:"
   );
+
+  // "Alla scadenza" records the exact due time, so it only makes sense once that has passed.
+  const dueBtn = el("action-due");
+  const dueAvailable = due.getTime() <= now.getTime() + FUTURE_TOLERANCE_MS;
+  setText(
+    el("action-due-when"),
+    dueAvailable ? fmtDateTime(s.due_at) : `disponibile dal ${fmtDateTime(s.due_at)}`
+  );
+  dueBtn.dataset.available = dueAvailable ? "1" : "";
+  dueBtn.disabled = state.busy || !dueAvailable;
 }
 
-const FUTURE_TOLERANCE_MS = 5 * 60000;
-
-// Reads the "when" picker: { at: Date|null } (null = server time) or { error }.
-function chosenTime() {
-  const mode = document.querySelector('input[name="when"]:checked').value;
-  if (mode === "now") return { at: null };
-
-  let at;
-  if (mode === "yesterday") {
-    at = new Date(Date.now() - 86400000);
-  } else {
-    const value = el("when-custom").value;
-    if (!value) return { error: "Seleziona data e ora." };
-    at = new Date(value);
-  }
-
+// Validates the custom date/time field: { at: Date } or { error }.
+function chosenCustomTime() {
+  const value = el("when-custom").value;
+  if (!value) return { error: "Seleziona data e ora." };
+  const at = new Date(value);
   if (at.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
     return { error: "L'orario non può essere nel futuro." };
   }
@@ -310,51 +312,62 @@ function chosenTime() {
   return { at };
 }
 
-function updateWhenPreview() {
-  const mode = document.querySelector('input[name="when"]:checked').value;
-  el("when-custom-field").classList.toggle("hidden", mode !== "custom");
-  if (mode === "custom" && !el("when-custom").value) {
-    el("when-custom").value = toLocalInputValue(new Date().toISOString());
-  }
+function setCustomPanel(open) {
+  el("custom-panel").classList.toggle("hidden", !open);
+  el("action-custom").setAttribute("aria-expanded", open ? "true" : "false");
   el("when-error").textContent = "";
   el("when-custom").removeAttribute("aria-invalid");
-  const { at } = chosenTime();
-  el("when-preview").textContent = at ? `Verrà registrato: ${fmtDateTime(at.toISOString())}` : "";
+  if (open) {
+    if (!el("when-custom").value) {
+      el("when-custom").value = toLocalInputValue(new Date().toISOString());
+    }
+    el("when-custom").focus();
+  } else {
+    el("when-custom").value = "";
+  }
 }
 
-function resetWhenPicker() {
-  document.querySelector('input[name="when"][value="now"]').checked = true;
-  el("when-custom").value = "";
-  el("when-details").open = false;
-  updateWhenPreview();
-}
-
-document.querySelectorAll('input[name="when"]').forEach((r) => {
-  r.addEventListener("change", updateWhenPreview);
+el("action-now").addEventListener("click", () => {
+  const s = state.status;
+  if (s && s.next_action) submitAction(s.next_action);
 });
-el("when-custom").addEventListener("input", updateWhenPreview);
 
-el("action-btn").addEventListener("click", () => {
+el("action-due").addEventListener("click", () => {
+  const s = state.status;
+  if (!s || !s.next_action || !s.due_at || !el("action-due").dataset.available) return;
+  // Sent verbatim: it is the server's own timestamp, so the next cycle lines up exactly.
+  submitAction(s.next_action, s.due_at);
+});
+
+el("action-custom").addEventListener("click", () => {
+  setCustomPanel(el("custom-panel").classList.contains("hidden"));
+});
+
+el("when-custom").addEventListener("input", () => {
+  el("when-error").textContent = "";
+  el("when-custom").removeAttribute("aria-invalid");
+});
+
+el("custom-submit").addEventListener("click", () => {
   const s = state.status;
   if (!s || !s.next_action) return;
-  const when = chosenTime();
+  const when = chosenCustomTime();
   if (when.error) {
-    el("when-details").open = true;
     el("when-error").textContent = when.error;
     el("when-custom").setAttribute("aria-invalid", "true");
     return;
   }
-  submitAction(s.next_action, when.at);
+  submitAction(s.next_action, when.at.toISOString());
 });
 
 async function submitAction(type, at = null) {
   if (state.busy) return;
   setBusy(true);
   try {
-    const body = at ? { type, at: at.toISOString() } : { type };
+    const body = at ? { type, at } : { type };
     const data = await api("/api/ring/action", jsonRequest("POST", body));
     state.status = data.status;
-    resetWhenPicker();
+    setCustomPanel(false);
     renderDashboard();
     showToast(type === "remove" ? "Anello tolto: registrato." : "Anello inserito: registrato.", {
       actionLabel: "Annulla",

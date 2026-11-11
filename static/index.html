@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="The Ring" />
-<link rel="stylesheet" href="/style.css?v=3" />
+<link rel="stylesheet" href="/style.css?v=5" />
 </head>
 <body>
 <div id="app">
@@ -70,25 +70,25 @@
           </div>
         </div>
 
-        <details id="when-details" class="when">
-          <summary>Registrato in un altro momento?</summary>
-          <fieldset class="when-options">
-            <legend class="sr-only">Quando è successo</legend>
-            <label class="pill"><input type="radio" name="when" value="now" checked /><span>Adesso</span></label>
-            <label class="pill"><input type="radio" name="when" value="yesterday" /><span>Ieri</span></label>
-            <label class="pill"><input type="radio" name="when" value="custom" /><span>Altro orario</span></label>
-          </fieldset>
-          <div id="when-custom-field" class="hidden">
+        <div class="action-block" role="group" aria-labelledby="action-title">
+          <p id="action-title" class="action-title"></p>
+          <div class="action-buttons">
+            <button type="button" id="action-now" class="btn btn-primary btn-large">Adesso</button>
+            <button type="button" id="action-due" class="btn btn-secondary btn-large">
+              <span>Alla scadenza prevista</span>
+              <small id="action-due-when"></small>
+            </button>
+            <button type="button" id="action-custom" class="btn btn-secondary btn-large" aria-expanded="false" aria-controls="custom-panel">Altro orario…</button>
+          </div>
+          <div id="custom-panel" class="custom-panel hidden">
             <label class="field">
               <span>Data e ora</span>
               <input type="datetime-local" id="when-custom" aria-describedby="when-error" />
             </label>
+            <p id="when-error" class="feedback error" role="alert"></p>
+            <button type="button" id="custom-submit" class="btn btn-primary">Registra</button>
           </div>
-          <p id="when-preview" class="hint" aria-live="polite"></p>
-          <p id="when-error" class="feedback error" role="alert"></p>
-        </details>
-
-        <button id="action-btn" class="btn btn-primary btn-large"></button>
+        </div>
       </div>
     </section>
 
@@ -170,6 +170,6 @@
   </div>
 </div>
 
-<script src="/app.js?v=3"></script>
+<script src="/app.js?v=5"></script>
 </body>
 </html>

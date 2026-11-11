@@ -1,8 +1,8 @@
-const CACHE_NAME = "the-ring-shell-v3";
+const CACHE_NAME = "the-ring-shell-v5";
 const SHELL_ASSETS = [
   "/",
-  "/style.css?v=3",
-  "/app.js?v=3",
+  "/style.css?v=5",
+  "/app.js?v=5",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

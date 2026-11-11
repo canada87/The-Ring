@@ -384,63 +384,37 @@ main {
   margin-top: 8px;
 }
 
-.when {
-  margin-bottom: 16px;
+.action-block {
+  margin-top: 8px;
 }
 
-.when summary {
-  display: flex;
-  align-items: center;
-  min-height: var(--tap);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-
-.when-options {
-  display: flex;
-  gap: 8px;
-  border: none;
+.action-title {
   margin: 0 0 12px;
-  padding: 0;
-}
-
-.pill {
-  flex: 1;
-  position: relative;
-}
-
-.pill input {
-  position: absolute;
-  opacity: 0;
-  inset: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.pill span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--tap);
-  padding: 0 8px;
-  border-radius: 12px;
-  border: 1px solid var(--text-muted);
-  font-size: var(--fs-sm);
-  font-weight: 600;
   text-align: center;
+  font-size: var(--fs-md);
+  font-weight: 600;
   color: var(--text);
 }
 
-.pill input:checked + span {
-  background: var(--accent-soft);
-  border-color: var(--accent-strong);
-  color: var(--accent-strong);
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.pill input:focus-visible + span {
-  outline: 3px solid var(--accent-strong);
-  outline-offset: 2px;
+.action-buttons .btn {
+  width: 100%;
+}
+
+.action-buttons .btn small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+
+.custom-panel {
+  margin-top: 12px;
 }
 
 .history-list {
